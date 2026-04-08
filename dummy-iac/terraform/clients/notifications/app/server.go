@@ -24,6 +24,9 @@ func startServer() {
 	// Auditoría: Árbol en cascada
 	mux.HandleFunc("/core/hierarchy/", handleGetHierarchy)
 
+	// Paso 3: Revocar acceso de subordinado
+	mux.HandleFunc("/core/hierarchy/revoke", handleRevokeAccess)
+
 	server := &http.Server{
 		Addr:              ":8080",
 		Handler:           mux,

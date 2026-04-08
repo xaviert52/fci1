@@ -38,6 +38,11 @@ type InviteClaims struct {
 	Exp       int64  `json:"exp"`
 }
 
+type RevokeAccessRequest struct {
+	ManagerID     string `json:"manager_id"`
+	SubordinateID string `json:"subordinate_id"`
+}
+
 func getEnvOrDefault(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value
@@ -214,4 +219,54 @@ func getSubordinatesRecursive(ketoReadURL, managerID string) []string {
 	}
 
 	return directSubordinates
+}
+
+// --- Paso 3: Revocar acceso de subordinado (Eliminar en Keto) ---
+func handleRevokeAccess(w http.ResponseWriter, r *http.Request) {
+	// Aceptamos DELETE o POST dependiendo de cómo lo dispare tu frontend
+	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req RevokeAccessRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid payload", http.StatusBadRequest)
+		return
+	}
+
+	if req.ManagerID == "" || req.SubordinateID == "" {
+		http.Error(w, "Faltan parametros requeridos", http.StatusBadRequest)
+		return
+	}
+
+	ketoWrite := getEnvOrDefault("KETO_WRITE_URL", "http://keto:4467")
+
+	// La API de eliminación de Keto requiere que los datos vayan en la URL, no en el body
+	url := fmt.Sprintf("%s/admin/relation-tuples?namespace=User&object=%s&relation=manager&subject_id=%s",
+		ketoWrite, req.SubordinateID, req.ManagerID)
+
+	reqKeto, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		http.Error(w, "Error construyendo peticion interna", http.StatusInternalServerError)
+		return
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	respKeto, err := client.Do(reqKeto)
+
+	// Keto suele devolver 204 No Content tras una eliminación exitosa
+	if err != nil || (respKeto.StatusCode != http.StatusNoContent && respKeto.StatusCode != http.StatusOK) {
+		http.Error(w, "Fallo la revocacion de jerarquia en Keto", http.StatusInternalServerError)
+		return
+	}
+	if respKeto != nil && respKeto.Body != nil {
+		defer respKeto.Body.Close()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "Permisos revocados exitosamente. El usuario ya no pertenece a la jerarquia.",
+		"success": true,
+	})
 }
