@@ -63,7 +63,47 @@ func handleEvents(w http.ResponseWriter, r *http.Request) {
 		env.Trace.RequestID,
 	)
 
+	// Lógica original (logs y auditoría interna en consola/Fargate)
 	dispatchNotification(env)
+
+	// =========================================================================
+	// NUEVA INTEGRACIÓN B2B: Notificar a notify_service
+	// =========================================================================
+
+	// Verificamos si el evento de Kratos es un registro exitoso o un login
+	// (Dependiendo de la versión de Kratos, el type puede variar ligeramente)
+	if env.Type == "registration.successful" || env.Type == "identity.registration.successful" {
+
+		// TODO: IMPORTANTE - ASIGNACIÓN DE VARIABLES
+		// Como desconozco la estructura interna exacta de tu archivo `envelope.go`,
+		// debes mapear el correo y el nombre desde el objeto `env`.
+		// Ejemplo: userEmail := env.Data.Identity.Traits["email"].(string)
+		userEmail := "correo@del.usuario" // REEMPLAZA ESTO CON LA RUTA REAL EN TU STRUCT
+		userName := "Usuario"             // REEMPLAZA ESTO CON LA RUTA REAL EN TU STRUCT
+
+		sendInternalNotification(EmailPayload{
+			Type:       "email",
+			Recipient:  userEmail,
+			Subject:    "Bienvenido a Primecore",
+			TemplateID: "welcome_user",
+			Data: map[string]string{
+				"user": userName,
+			},
+		})
+
+	} else if env.Type == "login.successful" || env.Type == "identity.login.successful" {
+
+		// Opcional: Enviar alerta de inicio de sesión exitoso al usuario
+		userEmail := "correo@del.usuario" // REEMPLAZA ESTO CON LA RUTA REAL EN TU STRUCT
+
+		sendInternalNotification(EmailPayload{
+			Type:       "email",
+			Recipient:  userEmail,
+			Subject:    "Nuevo inicio de sesión detectado",
+			TemplateID: "login_alert",
+			Data:       map[string]string{},
+		})
+	}
 
 	w.WriteHeader(http.StatusAccepted)
 }

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -84,8 +85,21 @@ func handleGenerateInvite(w http.ResponseWriter, r *http.Request) {
 
 	jwtToken := signatureInput + "." + signature
 
-	// Devolver el link mágico.
+	// Devolver el link mágico apuntando a front.primecore.online
 	inviteLink := fmt.Sprintf("https://%s/registro?invite_token=%s", getEnvOrDefault("DOMAIN", "front.primecore.online"), jwtToken)
+
+	// --- INTEGRACIÓN notify_service: Enviar correo de invitación si TargetEmail está presente ---
+	if req.TargetEmail != "" {
+		sendInternalNotification(EmailPayload{
+			Type:       "email",
+			Recipient:  req.TargetEmail,
+			Subject:    "Invitación a Primecore B2B",
+			TemplateID: "b2b_invite",
+			Data: map[string]string{
+				"link": inviteLink,
+			},
+		})
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -269,4 +283,53 @@ func handleRevokeAccess(w http.ResponseWriter, r *http.Request) {
 		"message": "Permisos revocados exitosamente. El usuario ya no pertenece a la jerarquia.",
 		"success": true,
 	})
+}
+
+// =========================================================================
+// MÓDULO DE INTEGRACIÓN DE CORREOS (notify_service)
+// =========================================================================
+
+// EmailPayload define la estructura requerida por notify_service
+type EmailPayload struct {
+	Type       string            `json:"type"`
+	Recipient  string            `json:"recipient"`
+	Subject    string            `json:"subject"`
+	TemplateID string            `json:"template_id"`
+	Data       map[string]string `json:"data"`
+}
+
+// sendInternalNotification dispara la petición HTTP a la instancia de flujos
+func sendInternalNotification(payload EmailPayload) {
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("Error serializando payload de correo: %v", err)
+		return
+	}
+
+	// URL base del notify_service en la instancia de flujos
+	notifyURL := getEnvOrDefault("NOTIFY_SERVICE_URL", "http://35.95.140.247:8081") + "/api/v1/notification/send"
+
+	reqNotify, err := http.NewRequest("POST", notifyURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Printf("Error creando HTTP request hacia notify_service: %v", err)
+		return
+	}
+	reqNotify.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(reqNotify)
+
+	if err != nil || resp.StatusCode >= 400 {
+		status := 0
+		if resp != nil {
+			status = resp.StatusCode
+		}
+		log.Printf("Advertencia: Falló envío hacia notify_service para %s. HTTP Status: %v", payload.Recipient, status)
+	} else {
+		log.Printf("Notificación encolada exitosamente en notify_service para %s", payload.Recipient)
+	}
+
+	if resp != nil && resp.Body != nil {
+		resp.Body.Close()
+	}
 }

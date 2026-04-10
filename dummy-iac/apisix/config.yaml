@@ -4,7 +4,7 @@ deployment:
     config_provider: etcd
   etcd:
     host:
-      - http://172.26.3.132:2379  # <-- NUEVA IP PRIVADA
+      - "http://34.217.51.225:2379"  # <-- NUEVA IP PRIVADA
     prefix: /apisix
   admin:
     admin_key_required: true

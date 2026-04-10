@@ -6,14 +6,14 @@ log:
 
 serve:
   public:
-    base_url: https://api.ztest.click/
+    base_url: https://front.primecore.online
     cors:
       enabled: true
       allowed_origins:
-        - https://api.ztest.click
-        - https://ztest.click
+        - "*"
+      allow_credentials: true
   admin:
-    base_url: http://dns-kratos.pry.internal:4434
+    base_url: http://kratos:4434
 
 identity:
   schemas:
@@ -21,10 +21,9 @@ identity:
       url: file:///etc/config/identity.schema.json
 
 selfservice:
-  default_browser_return_url: http://dummy.internal/return
+  default_browser_return_url: https://front.primecore.online/
   allowed_return_urls:
-    - http://dummy.internal
-    - https://api.ztest.click
+    - https://front.primecore.online
 
   methods:
     password:
@@ -37,12 +36,12 @@ selfservice:
   flows:
     registration:
       enabled: true
-      ui_url: http://dummy.internal/registration
+      ui_url: https://front.primecore.online/registro
       after:
         hooks:
           - hook: web_hook
             config:
-              url: http://dns-notifications.pry.internal:8080/events
+              url: http://notifications:8080/events
               method: POST
               can_interrupt: false
               body: file:///etc/config/hooks/registration.jsonnet
@@ -52,12 +51,12 @@ selfservice:
     verification:
       enabled: true
       use: code
-      ui_url: http://dummy.internal/verification
+      ui_url: https://front.primecore.online/verificacion
       after:
         hooks:
           - hook: web_hook
             config:
-              url: http://dns-notifications.pry.internal:8080/events
+              url: http://notifications:8080/events
               method: POST
               can_interrupt: false
               body: file:///etc/config/hooks/verification.jsonnet
@@ -67,12 +66,12 @@ selfservice:
     recovery:
       enabled: true
       use: code
-      ui_url: http://dummy.internal/recovery
+      ui_url: https://front.primecore.online/recuperacion
       after:
         hooks:
           - hook: web_hook
             config:
-              url: http://dns-notifications.pry.internal:8080/events
+              url: http://notifications:8080/events
               method: POST
               can_interrupt: false
               body: file:///etc/config/hooks/recovery.jsonnet
@@ -80,13 +79,13 @@ selfservice:
                 ignore: true
 
     settings:
-      ui_url: http://dummy.internal/settings
+      ui_url: https://front.primecore.online/ajustes
       privileged_session_max_age: 15m
       after:
         hooks:
           - hook: web_hook
             config:
-              url: http://dns-notifications.pry.internal:8080/events
+              url: http://notifications:8080/events
               method: POST
               can_interrupt: false
               body: file:///etc/config/hooks/settings.jsonnet
@@ -94,7 +93,7 @@ selfservice:
                 ignore: true
 
     login:
-      ui_url: http://dummy.internal/login
+      ui_url: https://front.primecore.online/login
 
 hashers:
   argon2:
@@ -107,10 +106,10 @@ hashers:
 session:
   lifespan: 1h
   cookie:
-    domain: ztest.click
+    domain: primecore.online
     same_site: Lax
 
 courier:
   smtp:
     connection_uri: smtp://localhost:1025/?skip_ssl_verify=true
-    from_address: no-reply@ztest.click
+    from_address: no-reply@primecore.online
