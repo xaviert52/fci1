@@ -12,9 +12,10 @@ type Envelope struct {
 }
 
 type Data struct {
-	IdentityID  string `json:"identity_id"`
-	FlowID      string `json:"flow_id,omitempty"`
-	InviteToken string `json:"invite_token,omitempty"`
+	IdentityID  string                 `json:"identity_id"`
+	FlowID      string                 `json:"flow_id,omitempty"`
+	InviteToken string                 `json:"invite_token,omitempty"`
+	Traits      map[string]interface{} `json:"traits,omitempty"` // Campo agregado para leer el email
 }
 
 type Trace struct {

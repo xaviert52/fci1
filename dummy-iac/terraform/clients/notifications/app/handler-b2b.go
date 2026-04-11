@@ -90,14 +90,11 @@ func handleGenerateInvite(w http.ResponseWriter, r *http.Request) {
 
 	// --- INTEGRACIÓN notify_service: Enviar correo de invitación si TargetEmail está presente ---
 	if req.TargetEmail != "" {
-		sendInternalNotification(EmailPayload{
-			Type:       "email",
-			Recipient:  req.TargetEmail,
-			Subject:    "Invitación a Primecore B2B",
-			TemplateID: "b2b_invite",
-			Data: map[string]string{
-				"link": inviteLink,
-			},
+		sendInternalNotification(NotificationPayload{
+			Type:      "email",
+			Recipient: req.TargetEmail,
+			Subject:   "Invitación a Primecore B2B",
+			Body:      "Has sido invitado a unirte a una organización en Primecore. Haz clic en el siguiente enlace para registrarte y aceptar la invitación: " + inviteLink,
 		})
 	}
 
@@ -237,7 +234,6 @@ func getSubordinatesRecursive(ketoReadURL, managerID string) []string {
 
 // --- Paso 3: Revocar acceso de subordinado (Eliminar en Keto) ---
 func handleRevokeAccess(w http.ResponseWriter, r *http.Request) {
-	// Aceptamos DELETE o POST dependiendo de cómo lo dispare tu frontend
 	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -256,7 +252,6 @@ func handleRevokeAccess(w http.ResponseWriter, r *http.Request) {
 
 	ketoWrite := getEnvOrDefault("KETO_WRITE_URL", "http://keto:4467")
 
-	// La API de eliminación de Keto requiere que los datos vayan en la URL, no en el body
 	url := fmt.Sprintf("%s/admin/relation-tuples?namespace=User&object=%s&relation=manager&subject_id=%s",
 		ketoWrite, req.SubordinateID, req.ManagerID)
 
@@ -269,7 +264,6 @@ func handleRevokeAccess(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	respKeto, err := client.Do(reqKeto)
 
-	// Keto suele devolver 204 No Content tras una eliminación exitosa
 	if err != nil || (respKeto.StatusCode != http.StatusNoContent && respKeto.StatusCode != http.StatusOK) {
 		http.Error(w, "Fallo la revocacion de jerarquia en Keto", http.StatusInternalServerError)
 		return
@@ -289,17 +283,16 @@ func handleRevokeAccess(w http.ResponseWriter, r *http.Request) {
 // MÓDULO DE INTEGRACIÓN DE CORREOS (notify_service)
 // =========================================================================
 
-// EmailPayload define la estructura requerida por notify_service
-type EmailPayload struct {
-	Type       string            `json:"type"`
-	Recipient  string            `json:"recipient"`
-	Subject    string            `json:"subject"`
-	TemplateID string            `json:"template_id"`
-	Data       map[string]string `json:"data"`
+// NotificationPayload define la estructura requerida por notify_service sin usar plantillas
+type NotificationPayload struct {
+	Type      string `json:"type"`
+	Recipient string `json:"recipient"`
+	Subject   string `json:"subject"`
+	Body      string `json:"body"`
 }
 
 // sendInternalNotification dispara la petición HTTP a la instancia de flujos
-func sendInternalNotification(payload EmailPayload) {
+func sendInternalNotification(payload NotificationPayload) {
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		log.Printf("Error serializando payload de correo: %v", err)
@@ -307,7 +300,7 @@ func sendInternalNotification(payload EmailPayload) {
 	}
 
 	// URL base del notify_service en la instancia de flujos
-	notifyURL := getEnvOrDefault("NOTIFY_SERVICE_URL", "http://35.95.140.247:8081") + "/api/v1/notification/send"
+	notifyURL := getEnvOrDefault("NOTIFY_SERVICE_URL", "http://35.95.140.247:8081") + "/api/v1/notify"
 
 	reqNotify, err := http.NewRequest("POST", notifyURL, bytes.NewBuffer(jsonData))
 	if err != nil {

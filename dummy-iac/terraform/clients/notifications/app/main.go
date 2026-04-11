@@ -14,5 +14,7 @@ func main() {
 	// Asegúrate de que la ruta sea exactamente esta y apunte a verifyAccess
 	http.HandleFunc("/api/v1/auth/verify", verifyAccess)
 
+	http.HandleFunc("/api/v1/apikey/generate", handleGenerateAPIKey)
+
 	startServer()
 }

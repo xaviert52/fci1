@@ -19,7 +19,6 @@ func handleEvents(w http.ResponseWriter, r *http.Request) {
 
 	var env Envelope
 	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(&env); err != nil {
 		log.Printf(`{"level":"error","msg":"invalid_json","error":"%s"}`, err)
@@ -63,46 +62,46 @@ func handleEvents(w http.ResponseWriter, r *http.Request) {
 		env.Trace.RequestID,
 	)
 
-	// Lógica original (logs y auditoría interna en consola/Fargate)
+	// Lógica original (logs y auditoría interna)
 	dispatchNotification(env)
 
 	// =========================================================================
 	// NUEVA INTEGRACIÓN B2B: Notificar a notify_service
 	// =========================================================================
 
-	// Verificamos si el evento de Kratos es un registro exitoso o un login
-	// (Dependiendo de la versión de Kratos, el type puede variar ligeramente)
-	if env.Type == "registration.successful" || env.Type == "identity.registration.successful" {
+	// Extracción segura del email desde los traits
+	userEmail, emailOk := env.Data.Traits["email"].(string)
 
-		// TODO: IMPORTANTE - ASIGNACIÓN DE VARIABLES
-		// Como desconozco la estructura interna exacta de tu archivo `envelope.go`,
-		// debes mapear el correo y el nombre desde el objeto `env`.
-		// Ejemplo: userEmail := env.Data.Identity.Traits["email"].(string)
-		userEmail := "correo@del.usuario" // REEMPLAZA ESTO CON LA RUTA REAL EN TU STRUCT
-		userName := "Usuario"             // REEMPLAZA ESTO CON LA RUTA REAL EN TU STRUCT
+	if !emailOk || userEmail == "" {
+		log.Printf(`{"level":"warn","msg":"missing_email_in_traits","identity_id":"%s"}`, env.Data.IdentityID)
+	} else {
+		userName := "Usuario" // Fallback seguro
 
-		sendInternalNotification(EmailPayload{
-			Type:       "email",
-			Recipient:  userEmail,
-			Subject:    "Bienvenido a Primecore",
-			TemplateID: "welcome_user",
-			Data: map[string]string{
-				"user": userName,
-			},
-		})
+		// Intentamos extraer el nombre de forma dinámica
+		if nameMap, ok := env.Data.Traits["name"].(map[string]interface{}); ok {
+			if first, ok := nameMap["first"].(string); ok {
+				userName = first
+			}
+		} else if nameStr, ok := env.Data.Traits["name"].(string); ok {
+			userName = nameStr
+		}
 
-	} else if env.Type == "login.successful" || env.Type == "identity.login.successful" {
+		if env.Type == "registration.successful" || env.Type == "identity.registration.successful" {
+			sendInternalNotification(NotificationPayload{
+				Type:      "email",
+				Recipient: userEmail,
+				Subject:   "Bienvenido a Primecore",
+				Body:      "Hola " + userName + ", ¡bienvenido a la plataforma Primecore! Tu registro ha sido exitoso.",
+			})
 
-		// Opcional: Enviar alerta de inicio de sesión exitoso al usuario
-		userEmail := "correo@del.usuario" // REEMPLAZA ESTO CON LA RUTA REAL EN TU STRUCT
-
-		sendInternalNotification(EmailPayload{
-			Type:       "email",
-			Recipient:  userEmail,
-			Subject:    "Nuevo inicio de sesión detectado",
-			TemplateID: "login_alert",
-			Data:       map[string]string{},
-		})
+		} else if env.Type == "login.successful" || env.Type == "identity.login.successful" {
+			sendInternalNotification(NotificationPayload{
+				Type:      "email",
+				Recipient: userEmail,
+				Subject:   "Nuevo inicio de sesión detectado",
+				Body:      "Hola " + userName + ", hemos detectado un nuevo inicio de sesión exitoso en tu cuenta de Primecore.",
+			})
+		}
 	}
 
 	w.WriteHeader(http.StatusAccepted)
