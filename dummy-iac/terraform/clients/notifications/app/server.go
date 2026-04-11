@@ -9,21 +9,20 @@ import (
 func startServer() {
 	mux := http.NewServeMux()
 
-	// Rutas originales de notificaciones y autenticación
+	// ----- RUTAS ORIGINALES -----
 	mux.HandleFunc("/events", handleEvents)
 	mux.HandleFunc("/api/v1/auth/verify", verifyAccess)
 
-	// ----- NUEVAS RUTAS CORE API (B2B2C MAGIC LINKS POKA-YOKE) -----
+	// ----- NUEVA RUTA: API KEYS (Para APISIX) -----
+	mux.HandleFunc("/api/v1/apikey/generate", handleGenerateAPIKey)
 
+	// ----- NUEVAS RUTAS: CORE API (B2B2C MAGIC LINKS) -----
 	// Paso 1: Generar link cifrado
 	mux.HandleFunc("/core/invites/generate", handleGenerateInvite)
-
 	// Paso 2: Consolidar tras registro
 	mux.HandleFunc("/core/invites/redeem", handleRedeemInvite)
-
 	// Auditoría: Árbol en cascada
 	mux.HandleFunc("/core/hierarchy/", handleGetHierarchy)
-
 	// Paso 3: Revocar acceso de subordinado
 	mux.HandleFunc("/core/hierarchy/revoke", handleRevokeAccess)
 

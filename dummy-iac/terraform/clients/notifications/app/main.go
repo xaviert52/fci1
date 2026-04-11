@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"net/http"
 )
 
 func main() {
@@ -10,11 +9,6 @@ func main() {
 
 	initDB()
 
-	http.HandleFunc("/events", handleEvents)
-	// Asegúrate de que la ruta sea exactamente esta y apunte a verifyAccess
-	http.HandleFunc("/api/v1/auth/verify", verifyAccess)
-
-	http.HandleFunc("/api/v1/apikey/generate", handleGenerateAPIKey)
-
+	// La delegación de rutas ahora está 100% en startServer() para evitar conflictos de Mux
 	startServer()
 }
