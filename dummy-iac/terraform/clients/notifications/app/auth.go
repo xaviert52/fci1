@@ -13,12 +13,7 @@ type KratosSession struct {
 	} `json:"identity"`
 }
 
-type KetoResponse struct {
-	Allowed bool `json:"allowed"`
-}
-
-// verifySignerAccess es el endpoint que APISIX consultará en cada petición
-// Renombramos la función para que sea genérica
+// verifyAccess es el endpoint que APISIX consultará en cada petición
 func verifyAccess(w http.ResponseWriter, r *http.Request) {
 	// Leer el servicio que APISIX nos está enviando
 	serviceName := r.URL.Query().Get("service")
@@ -57,6 +52,7 @@ func verifyAccess(w http.ResponseWriter, r *http.Request) {
 	userID := session.Identity.ID
 
 	// 3. Keto: Validación de Autorización
+	// CORREGIDO: Se usa el namespace plural "Services" para coincidir con la base de datos
 	ketoURL := fmt.Sprintf("http://keto:4466/relation-tuples/check?namespace=Services&object=%s&relation=access&subject_id=%s", serviceName, userID)
 	reqKeto, _ := http.NewRequest("GET", ketoURL, nil)
 
@@ -67,7 +63,7 @@ func verifyAccess(w http.ResponseWriter, r *http.Request) {
 	}
 	defer respKeto.Body.Close()
 
-	// Ory Keto responde 200 si es ALLOWED y 403 si es DENIED
+	// 4. Veredicto Final: Ory Keto responde 200 OK si es ALLOWED y 403 Forbidden si es DENIED
 	if respKeto.StatusCode == http.StatusOK {
 		w.WriteHeader(http.StatusOK) // APISIX deja pasar
 		return
@@ -77,15 +73,5 @@ func verifyAccess(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.Error(w, "Unexpected Keto response", http.StatusInternalServerError)
 		return
-	}
-
-	var ketoRes KetoResponse
-	json.NewDecoder(respKeto.Body).Decode(&ketoRes)
-
-	// 4. Veredicto Final
-	if ketoRes.Allowed {
-		w.WriteHeader(http.StatusOK)
-	} else {
-		http.Error(w, fmt.Sprintf("Forbidden: No tienes privilegios para usar %s", serviceName), http.StatusForbidden)
 	}
 }

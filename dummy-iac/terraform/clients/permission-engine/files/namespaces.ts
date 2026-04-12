@@ -36,6 +36,12 @@ class Company implements Namespace {
     developer: User[]
     team_lead: User[]
     admin: User[]
+
+    customer: User[]
+    seller: User[]
+    employee: User[]
+    owner: User[]
+    auditor: User[]
   }
 
   permits = {
